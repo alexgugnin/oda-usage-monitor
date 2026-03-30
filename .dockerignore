@@ -1,0 +1,7 @@
+local_mock_data/
+venv/
+mmoda_metrics_test.db
+src/db_handler_sqlite.py
+src/gatherer_sqlite.py
+.git/
+__pycache__/
