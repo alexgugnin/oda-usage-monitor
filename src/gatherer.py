@@ -1,6 +1,13 @@
-import os, glob, json, base64
+import os, glob, json, base64, time
+import logging
 from db_handler import DatabaseHandler
 
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger("usage-monitor")
 
 def scan_directory(scratch_dir):
     '''
@@ -12,13 +19,16 @@ def scan_directory(scratch_dir):
     '''
     #Scanning for parameters
     paths_for_analysis_parameters = os.path.join(scratch_dir, "scratch_sid_*/analysis_parameters.json")
-    paths_for_job_monitors = os.path.join(scratch_dir, "scratch_sid_*/job_monitor.json")
-
-    #List of Tuples of two paths - one for the analysis parameters and one for the job monitor.
-    #May be a problem if job monitor is creating after the analysis parameters?
-    job_files = zip(sorted(glob.glob(paths_for_analysis_parameters)), sorted(glob.glob(paths_for_job_monitors)))
+    analysis_files = glob.glob(paths_for_analysis_parameters)
     
-    for job_analysis_path, job_monitor_path in job_files:
+    for job_analysis_path in analysis_files:
+        #Preventing situation when job_monitor is not created yet by dispatcher, but analysis_parameters is already there.
+        folder_path = os.path.dirname(job_analysis_path)
+        job_monitor_path = os.path.join(folder_path, "job_monitor.json")
+
+        if not os.path.exists(job_monitor_path):
+            continue
+
         try:
             with open(job_analysis_path, 'r') as f:
                 data = json.load(f)
@@ -75,20 +85,27 @@ def main():
 
     db_pass = os.getenv("DB_PASS")
     if not db_pass:
-        raise ValueError("DB_PASS environment variable is missing. Cannot connect to the database.")
+        pass_error = "DB_PASS environment variable is missing. Cannot connect to the database."
+        logger.error(pass_error)
+        raise ValueError(pass_error)
 
+    logger.info(f"Starting oda-usage-monitor. Connecting to database at {db_host}...")
     db_handler = DatabaseHandler(host=db_host, user=db_user, password=db_pass, database=db_name)
 
     # Infinite loop to keep the sidecar running forever
-    import time
 
-    print(f"Scanning {scratch_dir}...")
+    logger.info(f"Monitoring initialized. Target directory: {scratch_dir}")
+
     while True:
         try:
+            jobs_processed = 0
             for job_data in scan_directory(scratch_dir):
                 db_handler.upsert_job(job_data)
+                jobs_processed += 1
+            logger.info(f"Scan cycle completed. Jobs processed: {jobs_processed}")
+
         except Exception as e:
-            print(f"Error during scan cycle: {e}")
+            logger.error(f"Critical error during scan cycle: {e}", exc_info=True)
         
         # Sleep for an hour before the next scan cycle
         time.sleep(3600)
