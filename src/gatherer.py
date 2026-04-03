@@ -81,7 +81,7 @@ def main():
     scratch_dir = os.getenv("SCRATCH_DIR", "/data/dispatcher_scratch/")
     db_host = os.getenv("DB_HOST", "mysql") # k8 service name for the mysql pod
     db_user = os.getenv("DB_USER", "stats_bot")
-    db_name = os.getenv("DB_NAME", "mmoda_metrics")
+    db_name = os.getenv("DB_NAME", "mmoda_usage")
 
     db_pass = os.getenv("DB_PASS")
     if not db_pass:
