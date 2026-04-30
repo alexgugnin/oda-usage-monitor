@@ -1,5 +1,9 @@
 import mysql.connector
 import os
+import time
+import logging
+
+logger = logging.getLogger("usage-monitor")
 
 class DatabaseHandler:
     def __init__(self, host, user, password, database):
@@ -16,7 +20,13 @@ class DatabaseHandler:
     def _get_connection(self):
         '''Helper func to create a new connection for each operation'''
 
-        return mysql.connector.connect(**self.config)
+        while True:
+            try:
+                conn = mysql.connector.connect(**self.config)
+                return conn
+            except:
+                logger.warning(f"Database connection failed. Retrying in 10 seconds...")
+                time.sleep(10)
 
     def _initialize_schema(self):
         '''Internal method to run the CREATE TABLE IF NOT EXISTS query'''
